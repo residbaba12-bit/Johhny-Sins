@@ -988,12 +988,4 @@ client.on('interactionCreate', async (i) => {
   }
 });
 
-// exports for template files that import from bot.js
-export const botConfig = {
-  prefix: PREFIX,
-  captainRoles: ALLOWED_ROLE_NAMES,
-  teamRegex: TEAM_REGEX,
-};
-export { client };
-
 client.login(process.env.TOKEN);

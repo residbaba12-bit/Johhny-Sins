@@ -1,651 +1,991 @@
-import { logger } from '../utils/logger.js';
-
-export const botConfig = {
-  // =========================
-  // BOT PRESENCE (what users see under the bot name)
-  // =========================
-  // `status` options:
-  // - "online"    = green dot
-  // - "idle"      = yellow moon
-  // - "dnd"       = red do-not-disturb
-  // - "invisible" = appears offline
-  presence: {
-    // Current online state shown on Discord.
-    status: "online",
-
-    // Activity lines shown under the bot name.
-    // `type` number mapping from Discord:
-    // 0 = Playing
-    // 1 = Streaming
-    // 2 = Listening
-    // 3 = Watching
-    // 4 = Custom
-    // 5 = Competing
-    activities: [
-      {
-        name: "Custom Status", // required by Discord API, not shown in the client
-        state: "stalking",     // this is what people actually see
-        type: 4,               // Custom
-      },
-    ],
-  },
-
-  // =========================
-  // COMMAND BEHAVIOR
-  // =========================
-  commands: {
-    // Bot owner user IDs (comma-separated in OWNER_IDS env var).
-    // Owners can access owner/admin-level bot commands.
-    owners: process.env.OWNER_IDS?.split(",").map((id) => id.trim()).filter(Boolean) || [],
-
-    // Default wait time between command uses (in seconds).
-    defaultCooldown: 3,
-
-    // If true, old commands are removed before re-registering.
-    deleteCommands: false,
-
-    // Optional server ID retained for tutorial compatibility; not used for command registration.
-    testGuildId: process.env.TEST_GUILD_ID,
-
-    // When true (or MAINTENANCE_MODE=true), only bot owners can run commands.
-    maintenanceMode: process.env.MAINTENANCE_MODE === "true",
-
-    // Command prefix for text-based commands (e.g., "!" for "!ping").
-    // Supports both slash commands and prefix commands.
-    prefix: process.env.PREFIX || "!",
-  },
-
-  // =========================
-  // APPLICATIONS SYSTEM
-  // =========================
-  applications: {
-    // Default questions shown when someone fills out an application.
-    defaultQuestions: [
-      { question: "What is your name?", required: true },
-      { question: "How old are you?", required: true },
-      { question: "Why do you want to join?", required: true },
-    ],
-
-    // Embed colors by application status.
-    statusColors: {
-      pending: "#FFA500",
-      approved: "#00FF00",
-      denied: "#FF0000",
-    },
-
-    // How long users must wait before submitting another application (hours).
-    applicationCooldown: 24,
-
-    // Auto-delete denied applications after this many days.
-    deleteDeniedAfter: 7,
-
-    // Auto-delete approved applications after this many days.
-    deleteApprovedAfter: 30,
-
-    // Role IDs allowed to manage applications.
-    managerRoles: [], // Will be populated from environment or database
-  },
-
-  // =========================
-  // EMBED COLORS & BRANDING
-  // =========================
-  // IMPORTANT: This is the SINGLE SOURCE OF TRUTH for all bot colors
-  embeds: {
-    colors: {
-      // Main brand colors.
-      primary: "#336699",
-      secondary: "#2F3136",
-
-      // Standard status colors for success/error/warning/info messages.
-      success: "#57F287",
-      error: "#ED4245",
-      warning: "#FEE75C",
-      info: "#3498DB",
-
-      // Neutral utility colors.
-      light: "#FFFFFF",
-      dark: "#202225",
-      gray: "#99AAB5",
-
-      // Discord-style palette shortcuts.
-      blurple: "#5865F2",
-      green: "#57F287",
-      yellow: "#FEE75C",
-      fuchsia: "#EB459E",
-      red: "#ED4245",
-      black: "#000000",
-
-      // Feature-specific colors.
-      giveaway: {
-        active: "#57F287",
-        ended: "#ED4245",
-      },
-      ticket: {
-        open: "#57F287",
-        claimed: "#FAA61A",
-        closed: "#ED4245",
-        pending: "#99AAB5",
-      },
-      economy: "#F1C40F",
-      birthday: "#E91E63",
-      moderation: "#9B59B6",
-
-      // Ticket priority color mapping.
-      priority: {
-        none: "#95A5A6",
-        low: "#3498db",
-        medium: "#2ecc71",
-        high: "#f1c40f",
-        urgent: "#e74c3c",
-      },
-    },
-    footer: {
-      // Default footer text used in bot embeds.
-      text: "Titan Bot",
-      // Footer icon URL (null = no icon).
-      icon: null,
-    },
-    // Default thumbnail URL for embeds (null = no thumbnail).
-    thumbnail: null,
-    author: {
-      // Optional default embed author block.
-      name: null,
-      icon: null,
-      url: null,
-    },
-  },
-
-  // =========================
-  // ECONOMY SETTINGS
-  // =========================
-  economy: {
-    currency: {
-      // Currency display name.
-      name: "coins",
-      // Plural display name.
-      namePlural: "coins",
-      // Currency symbol shown in balances.
-      symbol: "$",
-    },
-
-    // Starting balance for new users.
-    startingBalance: 0,
-
-    // Maximum bank amount before upgrades (if upgrades are used).
-    baseBankCapacity: 100000,
-
-    // Daily reward amount.
-    dailyAmount: 100,
-
-    // Work command random payout range.
-    workMin: 10,
-    workMax: 100,
-
-    // Beg command random payout range.
-    begMin: 5,
-    begMax: 50,
-
-    // Command cooldowns (milliseconds).
-    cooldowns: {
-      daily: 24 * 60 * 60 * 1000,
-      work: 60 * 60 * 1000,
-      crime: 2 * 60 * 60 * 1000,
-      rob: 4 * 60 * 60 * 1000,
-    },
-
-    // Chance to succeed when robbing (0.4 = 40%).
-    robSuccessRate: 0.4,
-
-    // Jail time after failed rob (milliseconds).
-    // 3600000 = 1 hour.
-    robFailJailTime: 3600000,
-  },
-
-  // =========================
-  // SHOP SETTINGS
-  // =========================
-  // Add shop defaults here when needed.
-  shop: {
-
-  },
-
-  // =========================
-  // TICKET SYSTEM
-  // =========================
-  tickets: {
-    // Category ID where new tickets are created (null = no forced category).
-    defaultCategory: null,
-
-    // Role IDs allowed to manage/support tickets.
-    supportRoles: [],
-
-    // Priority options users/staff can assign.
-    priorities: {
-      none: {
-        emoji: "⚪",
-        color: "#95A5A6",
-        label: "None",
-      },
-      low: {
-        emoji: "🟢",
-        color: "#2ECC71",
-        label: "Low",
-      },
-      medium: {
-        emoji: "🟡",
-        color: "#F1C40F",
-        label: "Medium",
-      },
-      high: {
-        emoji: "🔴",
-        color: "#E74C3C",
-        label: "High",
-      },
-      urgent: {
-        emoji: "🚨",
-        color: "#E91E63",
-        label: "Urgent",
-      },
-    },
-
-    // Default priority for new tickets.
-    defaultPriority: "none",
-
-    // Category ID where closed tickets are archived.
-    archiveCategory: null,
-
-    // Channel ID where ticket logs are sent.
-    logChannel: null,
-  },
-
-  // =========================
-  // GIVEAWAY SETTINGS
-  // =========================
-  giveaways: {
-    // Default giveaway duration in milliseconds.
-    // 86400000 = 24 hours.
-    defaultDuration: 86400000,
-
-    // Allowed winner count range.
-    minimumWinners: 1,
-    maximumWinners: 10,
-
-    // Allowed giveaway duration range in milliseconds.
-    // 300000 = 5 minutes.
-    minimumDuration: 300000,
-    // 2592000000 = 30 days.
-    maximumDuration: 2592000000,
-
-    // Role IDs allowed to host giveaways.
-    allowedRoles: [],
-
-    // Role IDs that bypass giveaway restrictions.
-    bypassRoles: [],
-  },
-
-  // =========================
-  // BIRTHDAY SETTINGS
-  // =========================
-  birthday: {
-    // Role ID given to users on their birthday.
-    defaultRole: null,
-
-    // Channel ID where birthday announcements are posted.
-    announcementChannel: null,
-
-    // Timezone used to calculate birthday dates.
-    timezone: "UTC",
-  },
-
-  // =========================
-  // VERIFICATION SETTINGS
-  // =========================
-  verification: {
-    // Message shown when posting the verification panel.
-    defaultMessage: "Click the button below to verify yourself and gain access to the server!",
-
-    // Text on the verification button.
-    defaultButtonText: "Verify",
-
-    // Automatic verification behavior.
-    autoVerify: {
-      // How automatic verification decides who is auto-approved:
-      // - "none"        = everyone is auto-verified immediately
-      // - "account_age" = account must be older than set days
-      // - "server_size" = auto-verify everyone only in smaller servers
-      defaultCriteria: "none",
-
-      // Days used when `defaultCriteria` is `account_age`.
-      defaultAccountAgeDays: 7,
-
-      // Member count threshold used when `defaultCriteria` is `server_size`.
-      // Example: 1000 means auto-verify if server has fewer than 1000 members.
-      serverSizeThreshold: 1000,
-
-      // Allowed safety limits for account-age requirements.
-      // 1 = minimum day, 365 = maximum days.
-      minAccountAge: 1,
-      maxAccountAge: 365,
-
-      // If true, user receives a DM after verification.
-      sendDMNotification: true,
-
-      // Human-readable descriptions for each criteria mode.
-      criteria: {
-        account_age: "Account must be older than specified days",
-        server_size: "All users if server has less than 1000 members",
-        none: "All users immediately"
-      }
-    },
-
-    // Minimum time between verification attempts (milliseconds).
-    // 5000 = 5 seconds.
-    verificationCooldown: 5000,
-
-    // Maximum failed attempts allowed inside the time window below.
-    maxVerificationAttempts: 3,
-
-    // Time window for counting attempts (milliseconds).
-    // 60000 = 1 minute.
-    attemptWindow: 60000,
-
-    // In-memory safety limits (helps avoid unbounded memory growth).
-    maxCooldownEntries: 10000,
-    maxAttemptEntries: 10000,
-    // Cleanup frequency for cooldown/attempt maps (milliseconds).
-    // 300000 = 5 minutes.
-    cooldownCleanupInterval: 300000,
-    // Maximum metadata payload size for audit entries (bytes).
-    maxAuditMetadataBytes: 4096,
-    // Maximum number of audit entries kept in memory.
-    maxInMemoryAuditEntries: 1000,
-    // If true, log every verification action.
-    logAllVerifications: true,
-    // If true, preserve verification audit history.
-    keepAuditTrail: true,
-  },
-
-  // =========================
-  // WELCOME / GOODBYE MESSAGES
-  // =========================
-  welcome: {
-    // Welcome template posted when a user joins.
-    // Placeholders: {user}, {server}, {memberCount}
-    defaultWelcomeMessage:
-      "Welcome {user} to {server}! We now have {memberCount} members!",
-    // Goodbye template posted when a user leaves.
-    // Placeholders: {user}, {memberCount}
-    defaultGoodbyeMessage:
-      "{user} has left the server. We now have {memberCount} members.",
-    // Channel ID for welcome messages.
-    defaultWelcomeChannel: null,
-    // Channel ID for goodbye messages.
-    defaultGoodbyeChannel: null,
-  },
-
-  // =========================
-  // COUNTER CHANNELS
-  // =========================
-  counters: {
-    defaults: {
-      // Default naming/description templates for counter entries.
-      name: "{name} Counter",
-      description: "Server {name} counter",
-      // Channel type used for counters (typically "voice").
-      type: "voice",
-      // Channel name format. `{count}` is replaced automatically.
-      channelName: "{name}-{count}",
-    },
-    permissions: {
-      // Default denied permissions for the counter channel.
-      deny: ["VIEW_CHANNEL"],
-      // Default allowed permissions for the counter channel.
-      allow: ["VIEW_CHANNEL", "CONNECT", "SPEAK"],
-    },
-    messages: {
-      // Default response messages for counter actions.
-      created: "✅ Created counter **{name}**",
-      deleted: "🗑️ Deleted counter **{name}**",
-      updated: "🔄 Updated counter **{name}**",
-    },
-    types: {
-      // Built-in counter types and how each count is calculated.
-      members: {
-        name: "👥 Members",
-        description: "Total members in the server",
-        getCount: (guild) => guild.memberCount.toString(),
-      },
-      bots: {
-        name: "🤖 Bots",
-        description: "Total bot accounts in the server",
-        getCount: (guild) =>
-          guild.members.cache.filter((m) => m.user.bot).size.toString(),
-      },
-      members_only: {
-        name: "👤 Humans",
-        description: "Total human members (non-bots)",
-        getCount: (guild) =>
-          guild.members.cache.filter((m) => !m.user.bot).size.toString(),
-      },
-    },
-  },
-
-  // =========================
-  // GENERIC BOT MESSAGES
-  // =========================
-  messages: {
-    noPermission: "You do not have permission to use this command.",
-    cooldownActive: "Please wait {time} before using this command again.",
-    errorOccurred: "An error occurred while executing this command.",
-    missingPermissions:
-      "I am missing required permissions to perform this action.",
-    commandDisabled: "This command has been disabled.",
-    maintenanceMode: "The bot is currently in maintenance mode.",
-  },
-
-  // =========================
-  // FEATURE TOGGLES
-  // =========================
-  // Set any feature to `false` to disable it globally.
-  features: {
-    // Core systems.
-    economy: true,
-    leveling: true,
-    moderation: true,
-    logging: true,
-    welcome: true,
-
-    // Community engagement systems.
-    tickets: true,
-    giveaways: true,
-    birthday: true,
-    counter: true,
-
-    // Security and self-service systems.
-    verification: true,
-    reactionRoles: true,
-    joinToCreate: true,
-
-    // Utility/quality-of-life modules.
-    voice: true,
-    search: true,
-    tools: true,
-    utility: true,
-    community: true,
-    fun: true,
-    music: true,
-  },
+require('dotenv').config();
+const fs = require('fs');
+const {
+  Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder,
+  ButtonBuilder, ButtonStyle, PermissionFlagsBits,
+} = require('discord.js');
+
+const PREFIX = '?';
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const TEAM_REGEX = /\| TEAM$/;
+const ALLOWED_ROLE_NAMES = ['captain', 'vice captain']; // sign / unsign / cd
+const CAPTAIN_CMDS = ['sign', 'unsign', 'cd', 'ranked'];
+const DB_FILE = './cooldowns.json';
+const WARN_FILE = './warns.json';
+const RANKED_FILE = './ranked.json';
+const RANKED_CHANNEL_NAME = 'ranked-scrims';     // channel is found by (part of) its name
+const RANKED_CHANNEL_ID = '1565156996775284776'; // fallback if the name isn't found
+const RANKED_COOLDOWN_MS = 30 * 60 * 1000;       // wait time between two uses (per TEAM role)
+const RANKED_LIMIT = 4;                          // uses per TEAM role per day
+const RESET_UTC_OFFSET_HOURS = 4;               // daily reset happens at 00:00 in this UTC offset
+const CASE_FILE = './cases.json';
+const TIMER_FILE = './timers.json';
+
+// ---------- storage ----------
+const load = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } };
+
+let db = load(DB_FILE, {});
+const save = () => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+const getCd = (id) => {
+  const t = db[id];
+  if (!t) return null;
+  if (t <= Date.now()) { delete db[id]; save(); return null; }
+  return t;
+};
+const setCd = (id) => { db[id] = Date.now() + COOLDOWN_MS; save(); return db[id]; };
+const delCd = (id) => { const had = !!db[id]; delete db[id]; save(); return had; };
+
+let warns = load(WARN_FILE, {});
+const saveWarns = () => fs.writeFileSync(WARN_FILE, JSON.stringify(warns, null, 2));
+
+let ranked = load(RANKED_FILE, {});
+const saveRanked = () => fs.writeFileSync(RANKED_FILE, JSON.stringify(ranked, null, 2));
+
+let cases = load(CASE_FILE, {});
+const saveCases = () => fs.writeFileSync(CASE_FILE, JSON.stringify(cases, null, 2));
+const addCase = (guildId, userId, type, modId, reason) => {
+  cases[guildId] ??= {};
+  cases[guildId][userId] ??= [];
+  cases[guildId][userId].push({ type, mod: modId, reason, time: Date.now() });
+  saveCases();
 };
 
-export function validateConfig(config) {
-  const errors = [];
+let timers = load(TIMER_FILE, []);
+const saveTimers = () => fs.writeFileSync(TIMER_FILE, JSON.stringify(timers, null, 2));
 
-  if (process.env.NODE_ENV !== 'production') {
-    logger.debug('Environment variables check:');
-    logger.debug('DISCORD_TOKEN exists:', !!process.env.DISCORD_TOKEN);
-    logger.debug('TOKEN exists:', !!process.env.TOKEN);
-    logger.debug('CLIENT_ID exists:', !!process.env.CLIENT_ID);
-    logger.debug('GUILD_ID exists:', !!process.env.GUILD_ID);
-    logger.debug('POSTGRES_HOST exists:', !!process.env.POSTGRES_HOST);
-    logger.debug('NODE_ENV:', process.env.NODE_ENV);
+// day key + next reset (00:00 in the configured UTC offset)
+const dayKey = () => new Date(Date.now() + RESET_UTC_OFFSET_HOURS * 36e5).toISOString().slice(0, 10);
+const nextReset = () => {
+  const [y, m, d] = dayKey().split('-').map(Number);
+  return Date.UTC(y, m - 1, d + 1) - RESET_UTC_OFFSET_HOURS * 36e5;
+};
+
+const ts = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
+
+// ---------- client ----------
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+  partials: [Partials.Channel],
+});
+
+const COLORS = { gold: 0xf1c40f, green: 0x2ecc71, red: 0xe74c3c, blue: 0x5865f2, orange: 0xe67e22 };
+const teamRolesOf = (member) => member.roles.cache.filter((r) => TEAM_REGEX.test(r.name));
+const isCaptain = (member) =>
+  member.roles.cache.some((r) => ALLOWED_ROLE_NAMES.includes(r.name.trim().toLowerCase()));
+
+const countWith = (role, memberId) => new Set([...role.members.keys(), memberId]).size;
+const countWithout = (role, memberId) => [...role.members.keys()].filter((id) => id !== memberId).length;
+
+// ---------- moderation helpers ----------
+const parseDuration = (s) => {
+  const m = /^(\d+)\s*(s|m|h|d|w)$/i.exec(s || '');
+  if (!m) return null;
+  const mult = { s: 1e3, m: 6e4, h: 36e5, d: 864e5, w: 6048e5 }[m[2].toLowerCase()];
+  return Number(m[1]) * mult;
+};
+const fmtDuration = (ms) => {
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return [d && `${d}d`, h && `${h}h`, m && `${m}m`, sec && !d && !h && `${sec}s`].filter(Boolean).join(' ') || '0s';
+};
+
+const resolveMember = async (msg, arg) => {
+  const m = msg.mentions.members.first();
+  if (m) return m;
+  if (arg && /^\d{17,20}$/.test(arg)) return msg.guild.members.fetch(arg).catch(() => null);
+  return null;
+};
+
+const resolveRole = (msg, text) => {
+  const m = msg.mentions.roles.first();
+  if (m) return m;
+  const q = (text || '').trim().toLowerCase();
+  if (!q) return null;
+  return msg.guild.roles.cache.get(q)
+    || msg.guild.roles.cache.find((r) => r.name.toLowerCase() === q)
+    || msg.guild.roles.cache.find((r) => r.name.toLowerCase().includes(q))
+    || null;
+};
+
+const hierarchyError = (msg, target) => {
+  if (target.id === msg.author.id) return "You can't do that to yourself!";
+  if (target.id === msg.guild.ownerId) return "You can't do that to the server owner!";
+  if (target.id === client.user.id) return 'Nice try. 😄';
+  if (msg.author.id !== msg.guild.ownerId && target.roles.highest.position >= msg.member.roles.highest.position) {
+    return 'That user has the same or a higher role than you.';
   }
+  return null;
+};
 
-  if (!process.env.DISCORD_TOKEN && !process.env.TOKEN) {
-    errors.push("Bot token is required (DISCORD_TOKEN or TOKEN environment variable)");
+const roleError = (msg, role, member) => {
+  const isOwner = msg.author.id === msg.guild.ownerId;
+  // hedef kullanici senden ust/esit ise rol veremez/alamazsin (kendin haric)
+  if (member && member.id !== msg.author.id) {
+    const he = hierarchyError(msg, member);
+    if (he) return he;
   }
-
-  if (!process.env.CLIENT_ID) {
-    errors.push("Client ID is required (CLIENT_ID environment variable)");
+  if (role.managed || role.id === msg.guild.id) return "I can't manage that role.";
+  if (!isOwner && role.position >= msg.member.roles.highest.position) {
+    return 'That role is higher than or equal to your highest role.';
   }
+  // sahip olmadigin yetkileri iceren rolu (ornegin Administrator) veremezsin
+  if (!isOwner) {
+    const missing = msg.member.permissions.missing(role.permissions);
+    if (missing.length) return `That role has permissions you don't have (${missing.slice(0, 3).join(', ')}).`;
+  }
+  if (!role.editable) return "I can't manage that role (it's above my role).";
+  return null;
+};
 
-  if (process.env.NODE_ENV === 'production') {
-    // A full connection URL (DATABASE_URL / POSTGRES_URL) satisfies all Postgres
-    // requirements, matching how src/config/database/postgres.js resolves the pool config.
-    const hasConnectionUrl = Boolean(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+const hasPerm = (msg, flag, name) => {
+  if (msg.member.permissions.has(flag)) return true;
+  msg.reply(`❌ You need the **${name}** permission to use this command.`);
+  return false;
+};
 
-    if (!hasConnectionUrl) {
-      if (!process.env.POSTGRES_HOST) {
-        errors.push("PostgreSQL connection is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_HOST)");
-      }
-      if (!process.env.POSTGRES_USER) {
-        errors.push("PostgreSQL user is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_USER)");
-      }
-      if (!process.env.POSTGRES_PASSWORD) {
-        errors.push("PostgreSQL password is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_PASSWORD)");
-      }
+const modEmbed = (title, color, user, mod, reason, extra = []) =>
+  new EmbedBuilder()
+    .setColor(color)
+    .setTitle(title)
+    .setThumbnail(user.displayAvatarURL())
+    .addFields(
+      { name: '👤 User', value: `${user} (${user.username})`, inline: true },
+      { name: '🛡️ Moderator', value: `${mod}`, inline: true },
+      ...extra,
+      { name: '📄 Reason', value: reason },
+    )
+    .setFooter({ text: `ID: ${user.id}` })
+    .setTimestamp();
+
+const dmAction = (user, guild, title, color, reason, extra = []) =>
+  user.send({
+    embeds: [new EmbedBuilder()
+      .setColor(color).setTitle(title)
+      .setDescription(`Server: **${guild.name}**`)
+      .addFields(...extra, { name: '📄 Reason', value: reason })
+      .setTimestamp()],
+  }).catch(() => {});
+
+const modLog = async (guild, embed) => {
+  const id = process.env.LOG_CHANNEL_ID;
+  if (!id) return;
+  const ch = guild.channels.cache.get(id) || (await guild.channels.fetch(id).catch(() => null));
+  ch?.send({ embeds: [embed] }).catch(() => {});
+};
+
+// send embed to channel + mod log + save case
+const done = async (msg, embed, type, user, reason) => {
+  addCase(msg.guild.id, user.id, type, msg.author.id, reason);
+  await msg.channel.send({ embeds: [embed] });
+  return modLog(msg.guild, embed);
+};
+
+// Discord button customId max length is 100 chars -> pack IDs in base36
+const enc = (id) => BigInt(id).toString(36);
+const dec = (str) => [...str].reduce((a, c) => a * 36n + BigInt(parseInt(c, 36)), 0n).toString();
+const pack = (...ids) => ids.map(enc).join('|');
+
+// DM first; if DMs are closed, post the offer in the channel (only the target can answer)
+const sendOffer = async (msg, target, embed, row) => {
+  try {
+    await target.send({ embeds: [embed], components: [row] });
+    return msg.react('✅').catch(() => {});
+  } catch (e) {
+    console.error('DM failed:', e.code, e.message);
+  }
+  try {
+    await msg.channel.send({
+      content: `${target}, I couldn't DM you, so your offer is posted here. Only you can answer it.`,
+      embeds: [embed],
+      components: [row],
+      allowedMentions: { users: [target.id] },
+    });
+    return msg.react('✅').catch(() => {});
+  } catch (e) {
+    console.error('Channel send failed:', e.code, e.message);
+    return msg.reply(`❌ I couldn't send the offer to **${target.user.username}**. Check that I can send messages and embeds in this channel.`).catch(() => {});
+  }
+};
+
+// ---------- timers (tempban / temprole) ----------
+const runTimers = async () => {
+  const now = Date.now();
+  const due = timers.filter((t) => t.at <= now);
+  if (!due.length) return;
+  timers = timers.filter((t) => t.at > now);
+  saveTimers();
+  for (const t of due) {
+    const guild = client.guilds.cache.get(t.guild);
+    if (!guild) continue;
+    if (t.type === 'unban') {
+      await guild.members.unban(t.user, 'Tempban expired').catch(() => {});
+    } else if (t.type === 'role') {
+      const m = await guild.members.fetch(t.user).catch(() => null);
+      if (m) await m.roles.remove(t.role, 'Temprole expired').catch(() => {});
     }
   }
-
-  return errors;
-}
-
-const configErrors = validateConfig(botConfig);
-if (configErrors.length > 0) {
-  logger.error("Bot configuration errors:", configErrors.join("\n"));
-  if (process.env.NODE_ENV === "production") {
-    process.exit(1);
-  }
-}
-
-export const BotConfig = botConfig;
-
-const COMMAND_CATEGORY_FEATURE_MAP = {
-  birthday: "birthday",
-  community: "community",
-  economy: "economy",
-  fun: "fun",
-  giveaway: "giveaways",
-  jointocreate: "joinToCreate",
-  leveling: "leveling",
-  logging: "logging",
-  moderation: "moderation",
-  music: "music",
-  reaction_roles: "reactionRoles",
-  search: "search",
-  serverstats: "counter",
-  ticket: "tickets",
-  tools: "tools",
-  utility: "utility",
-  verification: "verification",
-  welcome: "welcome",
 };
 
-function normalizeCategoryKey(category) {
-  return String(category || "").trim().toLowerCase().replace(/\s+/g, "_");
-}
+client.once('ready', async () => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
+  for (const g of client.guilds.cache.values()) {
+    await g.members.fetch().catch(() => {});
+  }
+  console.log('👥 Members cached.');
+  setInterval(() => runTimers().catch(() => {}), 30 * 1000);
+  runTimers().catch(() => {});
+});
 
-export function getCommandPrefix() {
-  return botConfig.commands?.prefix ?? "!";
-}
+// ---------- prefix commands ----------
+client.on('messageCreate', async (msg) => {
+  if (msg.author.bot || !msg.guild || !msg.content.startsWith(PREFIX)) return;
+  const args = msg.content.slice(PREFIX.length).trim().split(/\s+/);
+  const cmd = (args.shift() || '').toLowerCase();
+  if (!cmd) return;
 
-export function getBotOwners() {
-  return (botConfig.commands?.owners ?? [])
-    .map((id) => String(id).trim())
-    .filter(Boolean);
-}
+  const usage = (text) => msg.reply(`❌ **Usage:** \`${text}\``);
 
-export function isBotOwner(userId) {
-  if (!userId) {
-    return false;
+  // captain-only commands
+  if (CAPTAIN_CMDS.includes(cmd) && !isCaptain(msg.member)) {
+    return msg.reply('❌ Only **CAPTAIN** or **VICE CAPTAIN** can use this command.');
   }
 
-  return getBotOwners().includes(String(userId));
-}
+  try {
+    switch (cmd) {
+      // =====================================================
+      //  TEAM COMMANDS  (UNCHANGED)
+      // =====================================================
+      case 'sign': {
+        const target = msg.mentions.members.first();
+        if (!target) return usage('?sign @user');
+        if (target.id === msg.author.id) return msg.reply("❌ You can't sign yourself!");
+        if (target.user.bot) return msg.reply("❌ Bots can't join teams!");
 
-export function isMaintenanceMode() {
-  return botConfig.commands?.maintenanceMode === true;
-}
+        const cd = getCd(target.id);
+        if (cd) return msg.reply(`⏳ **${target.user.username}** is locked by the transfer cooldown. Available again ${ts(cd)}.`);
 
-export function getBotMessage(key, replacements = {}) {
-  let message = botConfig.messages?.[key] || key;
+        const teamRole = teamRolesOf(msg.member).first();
+        if (!teamRole) return msg.reply('❌ You need a role ending with `| TEAM` to sign players!');
+        if (target.roles.cache.has(teamRole.id)) return msg.reply(`❌ **${target.user.username}** is already on your team!`);
 
-  for (const [placeholder, value] of Object.entries(replacements)) {
-    message = message.replace(new RegExp(`\\{${placeholder}\\}`, "g"), String(value));
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.gold)
+          .setAuthor({ name: `${msg.author.username} sent you an offer`, iconURL: msg.author.displayAvatarURL() })
+          .setTitle('📜  TRANSFER OFFER')
+          .setDescription(`> **Do you want to join ${teamRole.name}?**\n> *A new chapter is waiting for you.*`)
+          .addFields(
+            { name: '🏆 Team', value: teamRole.name, inline: true },
+            { name: '🧑‍💼 Offered by', value: `${msg.author}`, inline: true },
+            { name: '👥 Members', value: `${teamRole.members.size}`, inline: true },
+            { name: '🔒 Lock', value: '24 hours after signing', inline: true },
+          )
+          .setThumbnail(msg.guild.iconURL())
+          .setFooter({ text: msg.guild.name })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`accept|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
+            .setLabel("Yes, I'm in!").setEmoji('✍️').setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`decline|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
+            .setLabel('No, thanks').setEmoji('🚫').setStyle(ButtonStyle.Danger),
+        );
+
+        return sendOffer(msg, target, embed, row);
+      }
+
+      case 'unsign': {
+        const target = msg.mentions.members.first();
+        if (!target) return usage('?unsign @user');
+        if (target.id === msg.author.id) return msg.reply("❌ You can't unsign yourself!");
+        if (target.user.bot) return msg.reply("❌ Bots aren't on teams!");
+
+        const cd = getCd(target.id);
+        if (cd) return msg.reply(`⏳ **${target.user.username}** is locked by the transfer cooldown. Available again ${ts(cd)}.`);
+
+        const myTeams = teamRolesOf(msg.member);
+        if (!myTeams.size) return msg.reply('❌ You need a role ending with `| TEAM` to use this command!');
+
+        const shared = myTeams.find((r) => target.roles.cache.has(r.id));
+        if (!shared) return msg.reply(`❌ **${target.user.username}** is not on your team!`);
+
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.red)
+          .setAuthor({ name: `${msg.author.username} is asking you something`, iconURL: msg.author.displayAvatarURL() })
+          .setTitle('🚪  LEAVE THE TEAM?')
+          .setDescription(`> **Do you want to leave ${shared.name}?**\n> This action can't be undone.`)
+          .addFields(
+            { name: '🏆 Team', value: shared.name, inline: true },
+            { name: '🧑‍💼 Requested by', value: `${msg.author}`, inline: true },
+            { name: '👥 Members', value: `${shared.members.size}`, inline: true },
+          )
+          .setThumbnail(msg.guild.iconURL())
+          .setFooter({ text: msg.guild.name })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`leave_yes|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
+            .setLabel("Yes, I'm leaving").setEmoji('🚪').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(`leave_no|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
+            .setLabel("No, I'll stay").setEmoji('🛡️').setStyle(ButtonStyle.Success),
+        );
+
+        return sendOffer(msg, target, embed, row);
+      }
+
+      case 'cd': {
+        const target = msg.mentions.members.first();
+        if (!target) return usage('?cd @user');
+        if (!delCd(target.id)) return msg.reply(`ℹ️ **${target.user.username}** has no active cooldown.`);
+        const embed = new EmbedBuilder()
+          .setColor(COLORS.green)
+          .setTitle('🔓  COOLDOWN REMOVED')
+          .setDescription(`${target} can transfer again.\n\n**Removed by:** ${msg.author}`)
+          .setTimestamp();
+        return msg.channel.send({ embeds: [embed] });
+      }
+
+      // =====================================================
+      //  RANKED (CAPTAIN / VICE CAPTAIN only, 4 per team per day)
+      // =====================================================
+      case 'ranked': {
+        const teamRole = teamRolesOf(msg.member).first();
+        if (!teamRole) return msg.reply('❌ You need a role ending with `| TEAM` to use this command!');
+
+        // limit is shared by the whole team role and resets every day at 00:00
+        const day = dayKey();
+        let rec = ranked[teamRole.id];
+        const last = rec && !Array.isArray(rec) ? rec.last || 0 : 0; // cooldown survives the daily reset
+        if (!rec || Array.isArray(rec) || rec.day !== day) rec = { day, count: 0, last };
+        if (rec.count >= RANKED_LIMIT) {
+          return msg.reply(`⏳ **${teamRole.name}** already used \`?ranked\` **${RANKED_LIMIT} times** today. Resets ${ts(nextReset())}.`);
+        }
+        if (Date.now() - rec.last < RANKED_COOLDOWN_MS) {
+          return msg.reply(`⏳ **${teamRole.name}** is on cooldown. You can use \`?ranked\` again ${ts(rec.last + RANKED_COOLDOWN_MS)}.`);
+        }
+
+        const allChannels = await msg.guild.channels.fetch().catch(() => msg.guild.channels.cache);
+        const ch = allChannels.find((c) => c && c.isTextBased() && !c.isThread()
+            && c.name.toLowerCase().includes(RANKED_CHANNEL_NAME))
+          || allChannels.get(RANKED_CHANNEL_ID);
+        if (!ch) return msg.reply(`❌ I can't find a channel with "${RANKED_CHANNEL_NAME}" in its name.`);
+
+        const findRole = (name) => msg.guild.roles.cache.find((r) => r.name.trim().toLowerCase() === name);
+        const captain = findRole('captain');
+        const vice = findRole('vice captain');
+        const pings = [captain, vice].filter(Boolean);
+
+        const text = `${teamRole} is lf ranked dm ${msg.author}`
+          + (pings.length ? `\n${pings.join(' ')}` : '');
+        try {
+          await ch.send({
+            content: text,
+            allowedMentions: { roles: [teamRole.id, ...pings.map((r) => r.id)], users: [msg.author.id] },
+          });
+        } catch (e) {
+          console.error('Ranked send failed:', e.code, e.message);
+          return msg.reply(`❌ I couldn't post in ${ch}: ${e.message}`);
+        }
+
+        rec.count += 1;
+        rec.last = Date.now();
+        ranked[teamRole.id] = rec;
+        saveRanked();
+        const left = RANKED_LIMIT - rec.count;
+        return msg.reply(`✅ Posted in ${ch}. **${teamRole.name}** has **${left}** use${left === 1 ? '' : 's'} left today.`);
+      }
+
+      // =====================================================
+      //  DYNO: ROLE COMMANDS
+      // =====================================================
+      // ?role @user <role>          -> toggle (has it: remove, hasn't: add)
+      // ?role add|remove @user <role>
+      case 'role': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageRoles, 'Manage Roles')) return;
+        const first = (args[0] || '').toLowerCase();
+        const mode = ['add', 'remove'].includes(first) ? first : 'toggle';
+        const rest = mode === 'toggle' ? args : args.slice(1);
+
+        const member = await resolveMember(msg, rest[0]);
+        if (!member) return usage('?role [add|remove] @user <role>');
+        const role = resolveRole(msg, rest.slice(1).join(' '));
+        if (!role) return msg.reply('❌ Role not found. Usage: `?role [add|remove] @user <role>`');
+        const err = roleError(msg, role, member);
+        if (err) return msg.reply(`❌ ${err}`);
+
+        const has = member.roles.cache.has(role.id);
+        const action = mode === 'toggle' ? (has ? 'remove' : 'add') : mode;
+        const quiet = { allowedMentions: { parse: [] } };
+
+        if (action === 'add') {
+          if (has) return msg.reply({ content: `ℹ️ **${member.user.username}** already has **${role.name}**.`, ...quiet });
+          await member.roles.add(role, `${msg.author.username} used ?role`);
+          return msg.reply({ content: `✅ Added **${role.name}** to **${member.user.username}**.`, ...quiet });
+        }
+        if (!has) return msg.reply({ content: `ℹ️ **${member.user.username}** doesn't have **${role.name}**.`, ...quiet });
+        await member.roles.remove(role, `${msg.author.username} used ?role`);
+        return msg.reply({ content: `✅ Removed **${role.name}** from **${member.user.username}**.`, ...quiet });
+      }
+
+      case 'addrole':
+      case 'delrole': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageRoles, 'Manage Roles')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage(`?${cmd} @user <role>`);
+        const role = resolveRole(msg, args.slice(1).join(' '));
+        if (!role) return msg.reply('❌ Role not found.');
+        const err = roleError(msg, role, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        const quiet = { allowedMentions: { parse: [] } };
+        if (cmd === 'addrole') {
+          if (member.roles.cache.has(role.id)) return msg.reply({ content: `ℹ️ **${member.user.username}** already has **${role.name}**.`, ...quiet });
+          await member.roles.add(role, `${msg.author.username} used ?addrole`);
+          return msg.reply({ content: `✅ Added **${role.name}** to **${member.user.username}**.`, ...quiet });
+        }
+        if (!member.roles.cache.has(role.id)) return msg.reply({ content: `ℹ️ **${member.user.username}** doesn't have **${role.name}**.`, ...quiet });
+        await member.roles.remove(role, `${msg.author.username} used ?delrole`);
+        return msg.reply({ content: `✅ Removed **${role.name}** from **${member.user.username}**.`, ...quiet });
+      }
+
+      case 'temprole': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageRoles, 'Manage Roles')) return;
+        const member = await resolveMember(msg, args[0]);
+        const duration = parseDuration(args[1]);
+        if (!member || !duration) return usage('?temprole @user <1h|2d|1w> <role>');
+        const role = resolveRole(msg, args.slice(2).join(' '));
+        if (!role) return msg.reply('❌ Role not found.');
+        const err = roleError(msg, role, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        await member.roles.add(role, `${msg.author.username} used ?temprole`);
+        timers.push({ type: 'role', guild: msg.guild.id, user: member.id, role: role.id, at: Date.now() + duration });
+        saveTimers();
+        return msg.reply({ content: `✅ **${role.name}** given to **${member.user.username}** for **${fmtDuration(duration)}**.`, allowedMentions: { parse: [] } });
+      }
+
+      case 'roles': {
+        const list = msg.guild.roles.cache.filter((r) => r.id !== msg.guild.id)
+          .sort((a, b) => b.position - a.position).map((r) => r.name);
+        const e = new EmbedBuilder().setColor(COLORS.blue)
+          .setTitle(`🎭 Roles (${list.length})`)
+          .setDescription(list.join(', ').slice(0, 4000) || 'None');
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'roleinfo': {
+        const role = resolveRole(msg, args.join(' '));
+        if (!role) return usage('?roleinfo <role>');
+        const e = new EmbedBuilder().setColor(role.color || COLORS.blue).setTitle(role.name)
+          .addFields(
+            { name: '🆔 ID', value: role.id, inline: true },
+            { name: '🎨 Color', value: role.hexColor, inline: true },
+            { name: '👥 Members', value: `${role.members.size}`, inline: true },
+            { name: '📌 Position', value: `${role.position}`, inline: true },
+            { name: '📣 Mentionable', value: role.mentionable ? 'Yes' : 'No', inline: true },
+            { name: '📅 Created', value: ts(role.createdTimestamp), inline: true },
+          );
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      // =====================================================
+      //  DYNO: MODERATION
+      // =====================================================
+      case 'ban': {
+        if (!hasPerm(msg, PermissionFlagsBits.BanMembers, 'Ban Members')) return;
+        const id = msg.mentions.users.first()?.id || (/^\d{17,20}$/.test(args[0] || '') ? args[0] : null);
+        if (!id) return usage('?ban @user [reason]');
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+
+        const member = await msg.guild.members.fetch(id).catch(() => null);
+        if (member) {
+          const err = hierarchyError(msg, member);
+          if (err) return msg.reply(`❌ ${err}`);
+          if (!member.bannable) return msg.reply("❌ I can't ban that user (their role is above mine).");
+          await dmAction(member.user, msg.guild, '🔨 You were banned', COLORS.red, reason);
+        }
+        const user = member?.user || (await client.users.fetch(id).catch(() => null));
+        if (!user) return msg.reply('❌ User not found.');
+
+        await msg.guild.members.ban(id, { reason: `${msg.author.username}: ${reason}` });
+        return done(msg, modEmbed('🔨  USER BANNED', COLORS.red, user, msg.author, reason), 'BAN', user, reason);
+      }
+
+      case 'tempban': {
+        if (!hasPerm(msg, PermissionFlagsBits.BanMembers, 'Ban Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        const duration = parseDuration(args[1]);
+        if (!member || !duration) return usage('?tempban @user <1h|2d|1w> [reason]');
+        const reason = args.slice(2).join(' ') || 'No reason provided';
+        const err = hierarchyError(msg, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        if (!member.bannable) return msg.reply("❌ I can't ban that user (their role is above mine).");
+
+        await dmAction(member.user, msg.guild, '⏳ You were temporarily banned', COLORS.red, reason,
+          [{ name: '⏱️ Duration', value: fmtDuration(duration), inline: true }]);
+        await msg.guild.members.ban(member.id, { reason: `Tempban by ${msg.author.username}: ${reason}` });
+        timers.push({ type: 'unban', guild: msg.guild.id, user: member.id, at: Date.now() + duration });
+        saveTimers();
+        return done(msg, modEmbed('⏳  USER TEMPBANNED', COLORS.red, member.user, msg.author, reason,
+          [{ name: '⏱️ Duration', value: `${fmtDuration(duration)} (ends ${ts(Date.now() + duration)})`, inline: true }]),
+        'TEMPBAN', member.user, reason);
+      }
+
+      case 'softban': {
+        if (!hasPerm(msg, PermissionFlagsBits.BanMembers, 'Ban Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?softban @user [reason]');
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const err = hierarchyError(msg, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        if (!member.bannable) return msg.reply("❌ I can't ban that user (their role is above mine).");
+
+        await dmAction(member.user, msg.guild, '🧹 You were softbanned', COLORS.orange, reason);
+        await msg.guild.members.ban(member.id, { reason: `Softban by ${msg.author.username}: ${reason}`, deleteMessageSeconds: 7 * 24 * 3600 });
+        await msg.guild.members.unban(member.id, 'Softban').catch(() => {});
+        return done(msg, modEmbed('🧹  USER SOFTBANNED', COLORS.orange, member.user, msg.author, reason,
+          [{ name: 'ℹ️ Info', value: 'Messages from the last 7 days deleted', inline: true }]),
+        'SOFTBAN', member.user, reason);
+      }
+
+      case 'unban': {
+        if (!hasPerm(msg, PermissionFlagsBits.BanMembers, 'Ban Members')) return;
+        if (!/^\d{17,20}$/.test(args[0] || '')) return usage('?unban <userID> [reason]');
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const user = await msg.guild.members.unban(args[0], `${msg.author.username}: ${reason}`).catch(() => null);
+        if (!user) return msg.reply('❌ That user is not banned (or the ID is wrong).');
+        timers = timers.filter((t) => !(t.type === 'unban' && t.user === user.id && t.guild === msg.guild.id));
+        saveTimers();
+        return done(msg, modEmbed('✅  USER UNBANNED', COLORS.green, user, msg.author, reason), 'UNBAN', user, reason);
+      }
+
+      case 'kick': {
+        if (!hasPerm(msg, PermissionFlagsBits.KickMembers, 'Kick Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?kick @user [reason]');
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const err = hierarchyError(msg, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        if (!member.kickable) return msg.reply("❌ I can't kick that user (their role is above mine).");
+
+        await dmAction(member.user, msg.guild, '👢 You were kicked', COLORS.orange, reason);
+        await member.kick(`${msg.author.username}: ${reason}`);
+        return done(msg, modEmbed('👢  USER KICKED', COLORS.orange, member.user, msg.author, reason), 'KICK', member.user, reason);
+      }
+
+      case 'mute':
+      case 'timeout': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?mute @user [10m|2h|1d] [reason]');
+        const rest = args.slice(1);
+        let duration = parseDuration(rest[0]);
+        const reason = (duration ? rest.slice(1) : rest).join(' ') || 'No reason provided';
+        if (!duration) duration = 10 * 60 * 1000; // default 10 minutes
+        if (duration > 28 * 864e5) return msg.reply('❌ Maximum mute duration is **28 days**.');
+        const err = hierarchyError(msg, member);
+        if (err) return msg.reply(`❌ ${err}`);
+        if (!member.moderatable) return msg.reply("❌ I can't mute that user (their role is above mine).");
+
+        await member.timeout(duration, `${msg.author.username}: ${reason}`);
+        await dmAction(member.user, msg.guild, '🔇 You were muted', COLORS.orange, reason,
+          [{ name: '⏱️ Duration', value: fmtDuration(duration), inline: true }]);
+        return done(msg, modEmbed('🔇  USER MUTED', COLORS.orange, member.user, msg.author, reason,
+          [{ name: '⏱️ Duration', value: `${fmtDuration(duration)} (ends ${ts(Date.now() + duration)})`, inline: true }]),
+        'MUTE', member.user, reason);
+      }
+
+      case 'unmute':
+      case 'untimeout': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?unmute @user [reason]');
+        const reason = args.slice(1).join(' ') || 'No reason provided';
+        const uerr = hierarchyError(msg, member);
+        if (uerr) return msg.reply(`❌ ${uerr}`);
+        if (!member.isCommunicationDisabled()) return msg.reply('ℹ️ That user is not muted.');
+        if (!member.moderatable) return msg.reply("❌ I can't unmute that user.");
+        await member.timeout(null, `${msg.author.username}: ${reason}`);
+        return done(msg, modEmbed('🔊  USER UNMUTED', COLORS.green, member.user, msg.author, reason), 'UNMUTE', member.user, reason);
+      }
+
+      case 'warn': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?warn @user <reason>');
+        const reason = args.slice(1).join(' ');
+        if (!reason) return usage('?warn @user <reason>');
+        const err = hierarchyError(msg, member);
+        if (err) return msg.reply(`❌ ${err}`);
+
+        warns[msg.guild.id] ??= {};
+        warns[msg.guild.id][member.id] ??= [];
+        warns[msg.guild.id][member.id].push({ mod: msg.author.id, reason, time: Date.now() });
+        saveWarns();
+        const total = warns[msg.guild.id][member.id].length;
+
+        await dmAction(member.user, msg.guild, '⚠️ You were warned', COLORS.gold, reason,
+          [{ name: '📊 Total warnings', value: `${total}`, inline: true }]);
+        return done(msg, modEmbed('⚠️  USER WARNED', COLORS.gold, member.user, msg.author, reason,
+          [{ name: '📊 Total warnings', value: `${total}`, inline: true }]),
+        'WARN', member.user, reason);
+      }
+
+      case 'warnings':
+      case 'warns': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?warnings @user');
+        const list = warns[msg.guild.id]?.[member.id] || [];
+        if (!list.length) return msg.reply(`✅ **${member.user.username}** has no warnings.`);
+        const lines = list.slice(-10).map((w, i) =>
+          `**${list.length - Math.min(10, list.length) + i + 1}.** ${w.reason}\n> by <@${w.mod}> ${ts(w.time)}`);
+        const e = new EmbedBuilder()
+          .setColor(COLORS.gold)
+          .setTitle(`⚠️  Warnings for ${member.user.username}`)
+          .setThumbnail(member.user.displayAvatarURL())
+          .setDescription(lines.join('\n\n'))
+          .setFooter({ text: `Total: ${list.length}` });
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'delwarn': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        const n = parseInt(args[1], 10);
+        if (!member || !n) return usage('?delwarn @user <warning number>');
+        const derr = hierarchyError(msg, member);
+        if (derr) return msg.reply(`❌ ${derr}`);
+        const list = warns[msg.guild.id]?.[member.id] || [];
+        if (n < 1 || n > list.length) return msg.reply('❌ Invalid warning number.');
+        list.splice(n - 1, 1);
+        saveWarns();
+        return msg.reply(`✅ Removed warning **#${n}** from **${member.user.username}**.`);
+      }
+
+      case 'clearwarns': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?clearwarns @user');
+        const cerr = hierarchyError(msg, member);
+        if (cerr) return msg.reply(`❌ ${cerr}`);
+        if (warns[msg.guild.id]?.[member.id]) { delete warns[msg.guild.id][member.id]; saveWarns(); }
+        return msg.reply(`✅ Cleared all warnings of **${member.user.username}**.`);
+      }
+
+      case 'note': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        const text = args.slice(1).join(' ');
+        if (!member || !text) return usage('?note @user <text>');
+        addCase(msg.guild.id, member.id, 'NOTE', msg.author.id, text);
+        return msg.reply(`📝 Note added to **${member.user.username}**.`);
+      }
+
+      case 'modlogs':
+      case 'notes': {
+        if (!hasPerm(msg, PermissionFlagsBits.ModerateMembers, 'Timeout Members')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage(`?${cmd} @user`);
+        let list = cases[msg.guild.id]?.[member.id] || [];
+        if (cmd === 'notes') list = list.filter((c) => c.type === 'NOTE');
+        if (!list.length) return msg.reply(`✅ **${member.user.username}** has no ${cmd === 'notes' ? 'notes' : 'mod logs'}.`);
+        const lines = list.slice(-10).map((c) => `**${c.type}** — ${c.reason}\n> by <@${c.mod}> ${ts(c.time)}`);
+        const e = new EmbedBuilder()
+          .setColor(COLORS.blue)
+          .setTitle(`📋  ${cmd === 'notes' ? 'Notes' : 'Mod logs'} for ${member.user.username}`)
+          .setThumbnail(member.user.displayAvatarURL())
+          .setDescription(lines.join('\n\n').slice(0, 4000))
+          .setFooter({ text: `Total: ${list.length}` });
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'purge':
+      case 'clean':
+      case 'clear': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageMessages, 'Manage Messages')) return;
+        const n = parseInt(args[0], 10);
+        if (!n || n < 1 || n > 1000) return usage('?purge <1-1000> [@user | bots]');
+        const only = msg.mentions.users.first();
+        const botsOnly = (args[1] || '').toLowerCase() === 'bots';
+        await msg.delete().catch(() => {});
+
+        let deleted = 0;
+        if (only || botsOnly) {
+          const fetched = await msg.channel.messages.fetch({ limit: 100 });
+          const list = [...fetched.filter((m) => (only ? m.author.id === only.id : m.author.bot)).values()].slice(0, n);
+          if (list.length) deleted = (await msg.channel.bulkDelete(list, true)).size;
+        } else {
+          let remaining = n;
+          while (remaining > 0) {
+            const batch = Math.min(remaining, 100);
+            const d = await msg.channel.bulkDelete(batch, true);
+            deleted += d.size;
+            if (d.size < batch) break; // older than 14 days or nothing left
+            remaining -= batch;
+          }
+        }
+        const note = await msg.channel.send(`🧹 Deleted **${deleted}** messages.`);
+        setTimeout(() => note.delete().catch(() => {}), 4000);
+        return modLog(msg.guild, new EmbedBuilder()
+          .setColor(COLORS.blue).setTitle('🧹  MESSAGES PURGED')
+          .addFields(
+            { name: '🛡️ Moderator', value: `${msg.author}`, inline: true },
+            { name: '📍 Channel', value: `${msg.channel}`, inline: true },
+            { name: '🗑️ Deleted', value: `${deleted}`, inline: true },
+          ).setTimestamp());
+      }
+
+      case 'slowmode': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageChannels, 'Manage Channels')) return;
+        const sec = parseInt(args[0], 10);
+        if (isNaN(sec) || sec < 0 || sec > 21600) return usage('?slowmode <0-21600 seconds>');
+        await msg.channel.setRateLimitPerUser(sec);
+        return msg.reply(sec === 0 ? '✅ Slowmode **disabled**.' : `✅ Slowmode set to **${sec}s**.`);
+      }
+
+      case 'lock': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageChannels, 'Manage Channels')) return;
+        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
+        return msg.channel.send('🔒 **Channel locked.** Use `?unlock` to open it again.');
+      }
+
+      case 'unlock': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageChannels, 'Manage Channels')) return;
+        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
+        return msg.channel.send('🔓 **Channel unlocked.**');
+      }
+
+      case 'nick': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageNicknames, 'Manage Nicknames')) return;
+        const member = await resolveMember(msg, args[0]);
+        if (!member) return usage('?nick @user [new nickname]');
+        const err = hierarchyError(msg, member);
+        if (err && member.id !== msg.author.id) return msg.reply(`❌ ${err}`);
+        if (!member.manageable) return msg.reply("❌ I can't change that user's nickname.");
+        const nick = args.slice(1).join(' ').slice(0, 32) || null;
+        await member.setNickname(nick);
+        return msg.reply(nick ? `✅ Nickname changed to **${nick}**.` : '✅ Nickname reset.');
+      }
+
+      case 'say': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageMessages, 'Manage Messages')) return;
+        const text = args.join(' ');
+        if (!text) return usage('?say <message>');
+        await msg.delete().catch(() => {});
+        return msg.channel.send({ content: text, allowedMentions: { parse: [] } });
+      }
+
+      case 'announce': {
+        if (!hasPerm(msg, PermissionFlagsBits.ManageMessages, 'Manage Messages')) return;
+        const ch = msg.mentions.channels.first();
+        const text = args.slice(1).join(' ');
+        if (!ch || !text) return usage('?announce #channel <message>');
+        const e = new EmbedBuilder().setColor(COLORS.blue).setTitle('📢  Announcement')
+          .setDescription(text).setFooter({ text: msg.guild.name }).setTimestamp();
+        await ch.send({ embeds: [e] });
+        return msg.react('✅').catch(() => {});
+      }
+
+      // =====================================================
+      //  INFO
+      // =====================================================
+      case 'ping':
+        return msg.reply(`🏓 Pong! **${client.ws.ping}ms**`);
+
+      case 'avatar': {
+        const user = msg.mentions.users.first() || msg.author;
+        const e = new EmbedBuilder()
+          .setColor(COLORS.blue)
+          .setTitle(`${user.username}'s avatar`)
+          .setImage(user.displayAvatarURL({ size: 1024 }));
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'membercount':
+        return msg.reply(`👥 **${msg.guild.memberCount}** members`);
+
+      case 'userinfo': {
+        const member = (await resolveMember(msg, args[0])) || msg.member;
+        const roles = member.roles.cache.filter((r) => r.id !== msg.guild.id)
+          .sort((a, b) => b.position - a.position).map((r) => `${r}`);
+        const e = new EmbedBuilder()
+          .setColor(member.displayColor || COLORS.blue)
+          .setTitle(member.user.username)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .addFields(
+            { name: '🆔 ID', value: member.id, inline: true },
+            { name: '📅 Created', value: ts(member.user.createdTimestamp), inline: true },
+            { name: '📥 Joined', value: ts(member.joinedTimestamp), inline: true },
+            { name: `🎭 Roles (${roles.length})`, value: roles.slice(0, 15).join(' ') || 'None' },
+          );
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'serverinfo': {
+        const g = msg.guild;
+        const owner = await g.fetchOwner().catch(() => null);
+        const e = new EmbedBuilder()
+          .setColor(COLORS.blue)
+          .setTitle(g.name)
+          .setThumbnail(g.iconURL())
+          .addFields(
+            { name: '👑 Owner', value: owner ? `${owner}` : 'Unknown', inline: true },
+            { name: '👥 Members', value: `${g.memberCount}`, inline: true },
+            { name: '💬 Channels', value: `${g.channels.cache.size}`, inline: true },
+            { name: '🎭 Roles', value: `${g.roles.cache.size}`, inline: true },
+            { name: '🚀 Boosts', value: `${g.premiumSubscriptionCount || 0}`, inline: true },
+            { name: '📅 Created', value: ts(g.createdTimestamp), inline: true },
+          )
+          .setFooter({ text: `ID: ${g.id}` });
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      case 'help': {
+        const e = new EmbedBuilder()
+          .setColor(COLORS.blue)
+          .setTitle('📖  Commands')
+          .setDescription(`Prefix: \`${PREFIX}\``)
+          .addFields(
+            { name: '🏆 Team (CAPTAIN / VICE CAPTAIN)',
+              value: '`?sign @user` `?unsign @user` `?cd @user`' },
+            { name: '🎮 Ranked (CAPTAIN / VICE CAPTAIN)', value: '`?ranked` (4 per team per day, 30 min cooldown)' },
+            { name: '🎭 Roles',
+              value: '`?role @user <role>` (toggle) `?role add|remove @user <role>`\n'
+                   + '`?addrole` `?delrole` `?temprole @user <1h|2d> <role>` `?roles` `?roleinfo <role>`' },
+            { name: '🔨 Moderation',
+              value: '`?ban` `?tempban @user <1d>` `?softban` `?unban <id>` `?kick`\n'
+                   + '`?mute @user [10m|2h|1d] [reason]` `?unmute`\n'
+                   + '`?warn` `?warnings` `?delwarn @user <#>` `?clearwarns`\n'
+                   + '`?note @user <text>` `?notes` `?modlogs`' },
+            { name: '🧹 Management',
+              value: '`?purge <1-1000> [@user|bots]` `?slowmode <sec>` `?lock` `?unlock`\n'
+                   + '`?nick @user [name]` `?say <text>` `?announce #channel <text>`' },
+            { name: 'ℹ️ Info',
+              value: '`?userinfo [@user]` `?serverinfo` `?avatar [@user]` `?membercount` `?ping`' },
+          );
+        return msg.channel.send({ embeds: [e] });
+      }
+
+      default:
+        return;
+    }
+  } catch (err) {
+    console.error(`Error in ?${cmd}:`, err);
+  }
+});
+
+// ---------- buttons (work inside DMs) ----------
+client.on('interactionCreate', async (i) => {
+  if (!i.isButton()) return;
+  const [action, ...packed] = i.customId.split('|');
+  if (!['accept', 'decline', 'leave_yes', 'leave_no'].includes(action)) return;
+  if (packed.length !== 5 || packed.some((x) => !/^[0-9a-z]+$/.test(x))) {
+    return i.reply({ content: '❌ This offer is outdated. Ask for a new one.', ephemeral: true });
+  }
+  const [guildId, channelId, otherId, roleId, targetId] = packed.map(dec);
+  if (targetId && i.user.id !== targetId) return i.reply({ content: "❌ This offer isn't for you.", ephemeral: true });
+
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) return i.reply({ content: '❌ Server not found.', ephemeral: true });
+  const member = await guild.members.fetch(i.user.id).catch(() => null);
+  if (!member) return i.reply({ content: '❌ You are not in that server anymore.', ephemeral: true });
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  const role = guild.roles.cache.get(roleId);
+  const roleName = role ? role.name : 'the team';
+
+  const finish = (embed) => i.update({ embeds: [embed], components: [] });
+  const announce = (embed) => channel?.send({ embeds: [embed] }).catch(() => {});
+
+  // ----- accept (cooldown starts here) -----
+  if (action === 'accept') {
+    const cd = getCd(i.user.id);
+    if (cd) return i.reply({ content: `⏳ You are on cooldown! Available again ${ts(cd)}.`, ephemeral: true });
+    if (!role) return i.reply({ content: '❌ That team role no longer exists.', ephemeral: true });
+
+    try {
+      const old = teamRolesOf(member);
+      if (old.size) await member.roles.remove(old);
+      await member.roles.add(role);
+    } catch {
+      return i.reply({ content: '❌ I could not change your roles. (Bot role must be above team roles with Manage Roles.)', ephemeral: true });
+    }
+    const until = setCd(i.user.id);
+    const count = countWith(role, member.id);
+
+    await finish(new EmbedBuilder()
+      .setColor(COLORS.green).setTitle('🎉  WELCOME TO THE TEAM')
+      .setDescription(`You are now part of **${roleName}**.\n\n🔒 Transfer lock ends ${ts(until)}.`)
+      .addFields({ name: '👥 Members', value: `${count}`, inline: true })
+      .setFooter({ text: guild.name }).setTimestamp());
+
+    return announce(new EmbedBuilder()
+      .setColor(COLORS.green).setTitle('✅  TRANSFER COMPLETE')
+      .setDescription(`🔥 ${i.user} has signed with **${roleName}**!\n\n> *Welcome to the family.*`)
+      .addFields(
+        { name: '🏆 Team', value: roleName, inline: true },
+        { name: '🧑‍💼 Signed by', value: `<@${otherId}>`, inline: true },
+        { name: '👥 Members', value: `${count}`, inline: true },
+        { name: '🔒 Lock ends', value: ts(until), inline: true },
+      )
+      .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
 
-  return message;
-}
-
-export function isFeatureEnabled(featureKey) {
-  if (!featureKey) {
-    return true;
+  // ----- decline (NO cooldown) -----
+  if (action === 'decline') {
+    await finish(new EmbedBuilder()
+      .setColor(COLORS.red).setTitle('🚫  OFFER DECLINED')
+      .setDescription('You turned the offer down.').setFooter({ text: guild.name }).setTimestamp());
+    return announce(new EmbedBuilder()
+      .setColor(COLORS.red).setTitle('🚫  OFFER DECLINED')
+      .setDescription(`${i.user} turned down the offer from <@${otherId}>.\n\n> *Not every road leads to the same place.*`)
+      .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
 
-  return botConfig.features?.[featureKey] !== false;
-}
+  // ----- leave yes (NO cooldown) -----
+  if (action === 'leave_yes') {
+    try {
+      const old = teamRolesOf(member); // removes EVERY role ending with | TEAM
+      if (old.size) await member.roles.remove(old);
+    } catch {
+      return i.reply({ content: '❌ I could not remove your roles. (Bot role must be above team roles with Manage Roles.)', ephemeral: true });
+    }
+    const count = role ? countWithout(role, member.id) : 0;
 
-export function isCommandCategoryEnabled(category) {
-  const normalized = normalizeCategoryKey(category);
+    await finish(new EmbedBuilder()
+      .setColor(COLORS.red).setTitle('👋  YOU LEFT THE TEAM')
+      .setDescription(`You are no longer part of **${roleName}**.`)
+      .setFooter({ text: guild.name }).setTimestamp());
 
-  if (!normalized || normalized === "core") {
-    return true;
+    return announce(new EmbedBuilder()
+      .setColor(COLORS.red).setTitle('🚪  PLAYER LEFT')
+      .setDescription(`${i.user} has left **${roleName}**.\n\n> *Every ending is a new beginning.*`)
+      .addFields(
+        { name: '🏆 Former team', value: roleName, inline: true },
+        { name: '🧑‍💼 Requested by', value: `<@${otherId}>`, inline: true },
+        { name: '👥 Members left', value: `${count}`, inline: true },
+      )
+      .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
 
-  const featureKey = COMMAND_CATEGORY_FEATURE_MAP[normalized];
-  if (!featureKey) {
-    return true;
+  // ----- leave no (NO cooldown) -----
+  if (action === 'leave_no') {
+    await finish(new EmbedBuilder()
+      .setColor(COLORS.green).setTitle('🛡️  STAYING PUT')
+      .setDescription('Good choice. Loyalty wins. 💪').setFooter({ text: guild.name }).setTimestamp());
+    return announce(new EmbedBuilder()
+      .setColor(COLORS.green).setTitle('🛡️  STAYING PUT')
+      .setDescription(`${i.user} decided to stay with **${roleName}**.\n\n> *Loyalty wins.* 💪`)
+      .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
+});
 
-  return isFeatureEnabled(featureKey);
-}
-
-export function getApplicationStatusColor(status) {
-  const colors = botConfig.applications?.statusColors || {};
-  const hex = colors[status];
-  return hex ? getColor(hex) : getColor(status === "approved" ? "success" : status === "denied" ? "error" : "warning");
-}
-
-export function getDefaultApplicationQuestions() {
-  return (botConfig.applications?.defaultQuestions || []).map((entry) =>
-    typeof entry === "string" ? entry : entry.question,
-  ).filter(Boolean);
-}
-
-export function getColor(path, fallback = "#99AAB5") {
-  
-  if (typeof path === "number") return path;
-  if (typeof path === "string" && path.startsWith("#")) {
-    
-    return parseInt(path.replace("#", ""), 16);
-  }
-  const result = path
-    .split(".")
-    .reduce(
-      (obj, key) => (obj && obj[key] !== undefined ? obj[key] : fallback),
-      botConfig.embeds.colors,
-    );
-  
-  if (typeof result === "string" && result.startsWith("#")) {
-    return parseInt(result.replace("#", ""), 16);
-  }
-  return result;
-}
-
-export function getRandomColor() {
-  const colors = Object.values(botConfig.embeds.colors).flatMap((color) =>
-    typeof color === "string" ? color : Object.values(color),
-  );
-  return colors[Math.floor(Math.random() * colors.length)];
-}
-
-export default botConfig;
+client.login(process.env.TOKEN);

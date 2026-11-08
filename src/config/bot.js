@@ -1,25 +1,34 @@
-import 'dotenv/config';
 import fs from 'fs';
+import path from 'path';
 import {
-  Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder,
-  ButtonBuilder, ButtonStyle, PermissionFlagsBits,
+  Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  PermissionFlagsBits, GatewayIntentBits,
 } from 'discord.js';
+
+// ===================================================================
+//  TEAM BOT PLUGIN  (sign / unsign / cd / ?ranked + moderation + roles)
+//  Usage: registerTeamBot(client)  -> call once, right after the client is created.
+//  It never calls client.login() and uses its own prefix ("?") and its own button ids ("tb_").
+// ===================================================================
+
+const DATA_DIR = path.join(process.cwd(), 'data', 'teambot');
+fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const PREFIX = '?';
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const TEAM_REGEX = /\| TEAM$/;
 const ALLOWED_ROLE_NAMES = ['captain', 'vice captain']; // sign / unsign / cd
 const CAPTAIN_CMDS = ['sign', 'unsign', 'cd', 'ranked'];
-const DB_FILE = './cooldowns.json';
-const WARN_FILE = './warns.json';
-const RANKED_FILE = './ranked.json';
+const DB_FILE = path.join(DATA_DIR, 'cooldowns.json');
+const WARN_FILE = path.join(DATA_DIR, 'warns.json');
+const RANKED_FILE = path.join(DATA_DIR, 'ranked.json');
 const RANKED_CHANNEL_NAME = 'ranked-scrims';     // channel is found by (part of) its name
 const RANKED_CHANNEL_ID = '1565156996775284776'; // fallback if the name isn't found
 const RANKED_COOLDOWN_MS = 30 * 60 * 1000;       // wait time between two uses (per TEAM role)
 const RANKED_LIMIT = 4;                          // uses per TEAM role per day
 const RESET_UTC_OFFSET_HOURS = 4;               // daily reset happens at 00:00 in this UTC offset
-const CASE_FILE = './cases.json';
-const TIMER_FILE = './timers.json';
+const CASE_FILE = path.join(DATA_DIR, 'cases.json');
+const TIMER_FILE = path.join(DATA_DIR, 'timers.json');
 
 // ---------- storage ----------
 const load = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } };
@@ -62,18 +71,7 @@ const nextReset = () => {
 
 const ts = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 
-// ---------- client ----------
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages,
-  ],
-  partials: [Partials.Channel],
-});
-
+export function registerTeamBot(client) {
 const COLORS = { gold: 0xf1c40f, green: 0x2ecc71, red: 0xe74c3c, blue: 0x5865f2, orange: 0xe67e22 };
 const teamRolesOf = (member) => member.roles.cache.filter((r) => TEAM_REGEX.test(r.name));
 const isCaptain = (member) =>
@@ -233,15 +231,21 @@ const runTimers = async () => {
   }
 };
 
-client.once('ready', async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+let started = false;
+const start = async () => {
+  if (started) return;
+  started = true;
+  console.log(`✅ Team bot plugin active as ${client.user.tag}`);
+  const need = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent];
+  const missing = need.filter((f) => !client.options.intents.has(f));
+  if (missing.length) console.warn('⚠️ Team bot: client is missing intents:', missing.join(', '));
   for (const g of client.guilds.cache.values()) {
     await g.members.fetch().catch(() => {});
   }
-  console.log('👥 Members cached.');
   setInterval(() => runTimers().catch(() => {}), 30 * 1000);
   runTimers().catch(() => {});
-});
+};
+if (client.isReady()) start(); else client.once(Events.ClientReady, start);
 
 // ---------- prefix commands ----------
 client.on('messageCreate', async (msg) => {
@@ -292,10 +296,10 @@ client.on('messageCreate', async (msg) => {
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId(`accept|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
+            .setCustomId(`tb_accept|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
             .setLabel("Yes, I'm in!").setEmoji('✍️').setStyle(ButtonStyle.Success),
           new ButtonBuilder()
-            .setCustomId(`decline|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
+            .setCustomId(`tb_decline|${pack(msg.guild.id, msg.channel.id, msg.author.id, teamRole.id, target.id)}`)
             .setLabel('No, thanks').setEmoji('🚫').setStyle(ButtonStyle.Danger),
         );
 
@@ -333,10 +337,10 @@ client.on('messageCreate', async (msg) => {
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId(`leave_yes|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
+            .setCustomId(`tb_leave_yes|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
             .setLabel("Yes, I'm leaving").setEmoji('🚪').setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
-            .setCustomId(`leave_no|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
+            .setCustomId(`tb_leave_no|${pack(msg.guild.id, msg.channel.id, msg.author.id, shared.id, target.id)}`)
             .setLabel("No, I'll stay").setEmoji('🛡️').setStyle(ButtonStyle.Success),
         );
 
@@ -886,7 +890,9 @@ client.on('messageCreate', async (msg) => {
 // ---------- buttons (work inside DMs) ----------
 client.on('interactionCreate', async (i) => {
   if (!i.isButton()) return;
-  const [action, ...packed] = i.customId.split('|');
+  const [rawAction, ...packed] = i.customId.split('|');
+  if (!rawAction.startsWith('tb_')) return; // not ours -> leave it to the template
+  const action = rawAction.slice(3);
   if (!['accept', 'decline', 'leave_yes', 'leave_no'].includes(action)) return;
   if (packed.length !== 5 || packed.some((x) => !/^[0-9a-z]+$/.test(x))) {
     return i.reply({ content: '❌ This offer is outdated. Ask for a new one.', ephemeral: true });
@@ -987,5 +993,4 @@ client.on('interactionCreate', async (i) => {
       .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
 });
-
-client.login(process.env.TOKEN);
+}

@@ -1,9 +1,9 @@
-require('dotenv').config();
-const fs = require('fs');
-const {
+import 'dotenv/config';
+import fs from 'fs';
+import {
   Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, PermissionFlagsBits,
-} = require('discord.js');
+} from 'discord.js';
 
 const PREFIX = '?';
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -987,5 +987,13 @@ client.on('interactionCreate', async (i) => {
       .setThumbnail(i.user.displayAvatarURL()).setFooter({ text: guild.name }).setTimestamp());
   }
 });
+
+// exports for template files that import from bot.js
+export const botConfig = {
+  prefix: PREFIX,
+  captainRoles: ALLOWED_ROLE_NAMES,
+  teamRegex: TEAM_REGEX,
+};
+export { client };
 
 client.login(process.env.TOKEN);
